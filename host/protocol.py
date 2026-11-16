@@ -2,11 +2,14 @@
 from __future__ import annotations
 
 import json
+import time
 from dataclasses import dataclass
 
 STATES = ("waiting", "error", "done", "working", "idle")
 PRIORITY = {s: i for i, s in enumerate(STATES)}
 ACTIONABLE = {"waiting", "error", "done"}
+# Estados "parados": o device mostra o horário em que a sessão chegou nele, não um contador.
+SHOW_TIME = {"done", "error"}
 MAX_LINE = 4096
 
 
@@ -28,15 +31,13 @@ def sort_sessions(sessions: list[Session]) -> list[Session]:
 
 
 def encode_snapshot(sessions: list[Session], seq: int, now: float) -> bytes:
-    payload = {
-        "snap": {
-            "seq": seq,
-            "sessions": [
-                {"id": s.id, "name": s.name[:32], "state": s.state, "age": max(0, int(now - s.since))}
-                for s in sort_sessions(sessions)
-            ],
-        }
-    }
+    def item(s: Session) -> dict:
+        d = {"id": s.id, "name": s.name[:32], "state": s.state, "age": max(0, int(now - s.since))}
+        if s.state in SHOW_TIME:
+            d["at"] = time.strftime("%H:%M", time.localtime(s.since))  # horário local do Mac
+        return d
+
+    payload = {"snap": {"seq": seq, "sessions": [item(s) for s in sort_sessions(sessions)]}}
     line = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
     if len(line) > MAX_LINE:
         # corta sessões do fim (menor prioridade) até caber

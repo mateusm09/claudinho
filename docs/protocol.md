@@ -10,6 +10,7 @@ Linhas que não são JSON válido (por exemplo, o log de boot da ROM) são ignor
 |---|---|
 | `{"hello":1,"board":"ESP32-S3-BOX","fw":"0.2.0"}` | A cada 2 s, enquanto ainda não recebeu nenhum snapshot (depois de boot ou reset) |
 | `{"focus":"<id>"}` | Toque numa linha da lista ou no botão "Ir para" |
+| `{"hide":"<id>"}` | Toque no ícone de olho riscado da linha. O host esconde a sessão até ela mudar de estado; o device já tira a linha localmente |
 | `{"ack":<seq>}` | Depois de aplicar um snapshot |
 
 ## Host → device
@@ -24,6 +25,7 @@ Linhas que não são JSON válido (por exemplo, o log de boot da ROM) são ignor
 - `sessions`: já vem **ordenada por prioridade** pelo host. O device não reordena.
 - `state`: um dos valores `waiting` | `error` | `done` | `working` | `idle`.
 - `age`: segundos desde a última mudança de estado. O device continua somando o tempo localmente entre um snapshot e outro.
+- `at` (só em `done` e `error`): `"HH:MM"` no horário local do Mac em que a sessão entrou no estado. Quando existe, o device mostra esse horário no lugar do contador.
 - `name`: o nome curto (basename do `cwd`), que o device trunca para caber na tela.
 
 O host envia o snapshot completo:

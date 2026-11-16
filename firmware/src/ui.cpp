@@ -18,6 +18,8 @@ constexpr int HEADER_H = 38;
 constexpr int ROW_Y0 = 42, ROW_H = 36, ROW_GAP = 4, VISIBLE_ROWS = 4;
 constexpr int BTN_Y = 198, BTN_H = 38;
 constexpr int BTN_IDX = 1000;  // marcador interno de "botão pressionado"
+constexpr int HIDE_W = 36;     // zona de toque do ícone "esconder", na ponta direita da linha
+constexpr int HIDE_X = W - 6 - HIDE_W;
 
 uint32_t rgb(uint32_t hex) { return lgfx::color888(hex >> 16, (hex >> 8) & 0xFF, hex & 0xFF); }
 
@@ -118,27 +120,41 @@ void drawHeader(const Model &m, int frame, bool bigMascot) {
   }
 }
 
+// Olho riscado ("esconder"), centrado em (cx, cy).
+void drawHideIcon(int cx, int cy, uint32_t c) {
+  g_fb.drawEllipse(cx, cy, 7, 4, c);
+  g_fb.fillCircle(cx, cy, 2, c);
+  g_fb.drawLine(cx - 7, cy + 6, cx + 7, cy - 6, c);
+  g_fb.drawLine(cx - 6, cy + 6, cx + 8, cy - 6, c);
+}
+
 void drawRow(const Model &m, int i, int y, uint32_t nowMs) {
   const SessionView &s = m.s[i];
-  bool pressed = (g_pressed == i || (g_pressed == BTN_IDX && i == m.target())) && nowMs < g_pressedUntil;
+  bool pressed = nowMs < g_pressedUntil && (g_pressed == i || (g_pressed == BTN_IDX && i == m.target()));
   g_fb.fillRoundRect(6, y, W - 12, ROW_H, 6, rgb(pressed ? C_ROW_HI : C_ROW));
   g_fb.fillRoundRect(6, y, 6, ROW_H, 3, rgb(C_STATE[s.state]));
 
+  // zona "esconder": separador fino + ícone (a linha some na hora ao tocar)
+  g_fb.drawFastVLine(HIDE_X, y + 8, ROW_H - 16, rgb(0x3A3A3A));
+  drawHideIcon(HIDE_X + HIDE_W / 2, y + ROW_H / 2, rgb(C_MUTED));
+
+  int right = HIDE_X - 8;
   char age[8];
-  fmtAge(m.ageNow(i, nowMs), age, sizeof age);
+  if (s.at[0]) strlcpy(age, s.at, sizeof age);  // pronto/erro: horário fixo, não conta
+  else fmtAge(m.ageNow(i, nowMs), age, sizeof age);
   g_fb.setFont(&fonts::Font2);
   g_fb.setTextDatum(textdatum_t::middle_right);
   g_fb.setTextColor(rgb(C_MUTED));
-  g_fb.drawString(age, W - 14, y + ROW_H / 2);
+  g_fb.drawString(age, right, y + ROW_H / 2);
   int ageW = g_fb.textWidth(age);
   g_fb.setTextColor(rgb(C_STATE[s.state]));
-  g_fb.drawString(L_STATE[s.state], W - 14 - ageW - 8, y + ROW_H / 2);
+  g_fb.drawString(L_STATE[s.state], right - ageW - 8, y + ROW_H / 2);
   int labelW = g_fb.textWidth(L_STATE[s.state]);
 
   g_fb.setFont(&fonts::FreeSans9pt7b);
   g_fb.setTextDatum(textdatum_t::middle_left);
   g_fb.setTextColor(rgb(C_TEXT));
-  drawFit(s.name, 20, y + ROW_H / 2, W - 14 - ageW - 8 - labelW - 12 - 20);
+  drawFit(s.name, 20, y + ROW_H / 2, right - ageW - 8 - labelW - 10 - 20);
 }
 
 void drawButton(const Model &m, uint32_t nowMs) {
@@ -234,7 +250,7 @@ int hitTest(const Model &m, int x, int y) {
   if (y >= ROW_Y0 && y < BTN_Y) {
     int i = (y - ROW_Y0) / (ROW_H + ROW_GAP);
     int within = (y - ROW_Y0) % (ROW_H + ROW_GAP);
-    if (within < ROW_H && i < std::min(m.n, VISIBLE_ROWS)) return i;
+    if (within < ROW_H && i < std::min(m.n, VISIBLE_ROWS)) return x >= HIDE_X ? HIT_HIDE + i : i;
   }
   return -1;
 }

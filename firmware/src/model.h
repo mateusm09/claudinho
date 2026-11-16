@@ -9,6 +9,7 @@ struct SessionView {
   char name[33];
   State state;
   uint32_t age;  // segundos no momento do snapshot
+  char at[6];    // "HH:MM" em que ficou pronta/erro (vazio nos outros estados)
 };
 
 struct Model {

@@ -14,4 +14,5 @@ bool animDue(const Model &m, uint32_t nowMs);
 void flashBorder(uint32_t untilMs);
 void setMutedIcon(bool muted);
 constexpr int HIT_HEADER = 2000;  // retorno de hitTest para toque no cabeçalho
+constexpr int HIT_HIDE = 3000;    // HIT_HIDE + i: ícone "esconder" da linha i
 }  // namespace ui

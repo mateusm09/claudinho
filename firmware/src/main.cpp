@@ -6,7 +6,7 @@
 #include "model.h"
 #include "ui.h"
 
-static constexpr const char *FW_VERSION = "0.4.0";
+static constexpr const char *FW_VERSION = "0.6.0";
 static constexpr int BTN_IDX = 1000;  // mesmo valor de ui.cpp
 
 static LGFX lcd;
@@ -38,6 +38,7 @@ static void handleLine(const char *line) {
     strlcpy(s.name, o["name"] | "?", sizeof s.name);
     s.state = parseState(o["state"] | "idle");
     s.age = o["age"] | 0;
+    strlcpy(s.at, o["at"] | "", sizeof s.at);
   }
   next.seq = snap["seq"] | 0;
   next.rxMillis = millis();
@@ -79,6 +80,17 @@ static void pollSerial() {
   }
 }
 
+// Esconde a linha na hora (o host confirma no próximo snapshot) e avisa o host.
+static void hideSession(int idx) {
+  if (idx < 0 || idx >= model.n) return;
+  JsonDocument doc;
+  doc["hide"] = model.s[idx].id;
+  serializeJson(doc, Serial);
+  Serial.print('\n');
+  for (int j = idx; j < model.n - 1; j++) model.s[j] = model.s[j + 1];
+  model.n--;
+}
+
 static void sendFocus(int idx) {
   if (idx == BTN_IDX) idx = model.target();
   if (idx < 0 || idx >= model.n) return;
@@ -98,6 +110,9 @@ static void pollTouch(uint32_t now) {
       audio::setMuted(!audio::muted());
       ui::setMutedIcon(audio::muted());
       if (!audio::muted()) audio::chime();  // amostra ao religar
+      dirty = true;
+    } else if (hit >= ui::HIT_HIDE) {
+      hideSession(hit - ui::HIT_HIDE);
       dirty = true;
     } else if (hit >= 0) {
       ui::setPressed(hit, now + 250);

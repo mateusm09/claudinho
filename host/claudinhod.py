@@ -109,9 +109,10 @@ class Store:
         with self._lock:
             return self._tracked.get(sid)
 
-    def mark_seen(self, sid: str) -> None:
+    def hide(self, sid: str) -> None:
         with self._lock:
-            if state.mark_seen(self._tracked, sid, time.time()):
+            if state.hide(self._tracked, sid):
+                log.info("sessão %s escondida pelo usuário", self._tracked[sid].name)
                 self._notify_locked()
 
     def snapshot_line(self) -> bytes:
@@ -119,7 +120,7 @@ class Store:
             self.seq += 1
             names = state.display_names(list(self._tracked.values()))
             visible = [Session(t.id, names[t.id], t.state, t.since)
-                       for t in self._tracked.values() if t.state != "idle"]
+                       for t in self._tracked.values() if t.state != "idle" and not t.hidden]
             return encode_snapshot(visible, self.seq, time.time())
 
 
@@ -220,10 +221,11 @@ def find_port(explicit: str | None) -> str | None:
 class DeviceLink:
     """Mantém a conexão serial: reconecta, responde ao hello, envia snapshots."""
 
-    def __init__(self, store: Store, port: str | None, on_focus) -> None:
+    def __init__(self, store: Store, port: str | None, on_focus, on_hide=None) -> None:
         self.store = store
         self.port_arg = port
         self.on_focus = on_focus
+        self.on_hide = on_hide or (lambda sid: None)
         self.ser: serial.Serial | None = None
         self._wlock = threading.Lock()
 
@@ -270,6 +272,8 @@ class DeviceLink:
                         self.send_snapshot()
                     elif "focus" in msg:
                         self.on_focus(str(msg["focus"]))
+                    elif "hide" in msg:
+                        self.on_hide(str(msg["hide"]))
             except (serial.SerialException, OSError) as e:
                 log.warning("conexão perdida: %s", e)
             finally:
@@ -347,7 +351,6 @@ def main() -> None:
         if not t:
             log.info("focus pedido para sessão desconhecida: %s", sid)
             return
-        store.mark_seen(sid)  # "done"/"error" vistos somem da tela
 
         def run() -> None:
             t0 = time.monotonic()
@@ -356,7 +359,7 @@ def main() -> None:
 
         threading.Thread(target=run, daemon=True).start()  # não bloqueia a leitura da serial
 
-    link = DeviceLink(store, args.port, on_focus=on_focus)
+    link = DeviceLink(store, args.port, on_focus=on_focus, on_hide=store.hide)
     threading.Thread(target=link.run_sender, daemon=True).start()
     try:
         link.run_reader()

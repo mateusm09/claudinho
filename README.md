@@ -58,7 +58,8 @@ Remove o daemon, as entradas do Claudinho no `settings.json` e a pasta `~/.claud
 
 Três casos que não seguem a tabela:
 - **Recusar uma pergunta ou permissão, ou apertar Esc, não dispara nenhum hook.** Enquanto uma sessão está esperando ou trabalhando, o daemon lê só os bytes novos do transcript dela e procura a marca `[Request interrupted by user…]`. Quando encontra, a sessão passa a **pronto**.
-- **Uma sessão pronta some** depois de 10 minutos, ou quando você toca nela.
+- **Uma sessão pronta some** depois de 10 minutos. Tocar nela leva você até a aba, mas ela continua na lista.
+- **O ícone de olho riscado** no fim de cada linha esconde a sessão. Ela volta sozinha quando muda de estado; por exemplo, se passar a esperar input, você não perde o alerta.
 - **Uma sessão cujo processo morreu** (`kill -9`, crash) é removida em até ~10 s. O daemon descobre o PID do `claude` pelo socket do hook.
 
 O hook manda ao daemon só o evento, o id da sessão, a pasta do projeto, o caminho do transcript e a aba do iTerm. O conteúdo de prompts, comandos e arquivos não sai do Claude Code.

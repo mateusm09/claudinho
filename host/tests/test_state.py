@@ -2,7 +2,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
-from state import DONE_TTL_S, Tracked, apply_event, display_names, expire, mark_seen  # noqa: E402
+from state import DONE_TTL_S, Tracked, apply_event, display_names, expire, hide  # noqa: E402
 
 
 def ev(name, sid="s1", **kw):
@@ -74,12 +74,24 @@ def test_done_expires_to_idle():
     assert ss["s1"].state == "idle"
 
 
-def test_mark_seen():
+def test_hide_until_state_changes():
     ss = run(ev("Stop"))
-    assert mark_seen(ss, "s1", 200) and ss["s1"].state == "idle"
-    ss = run(ev("PermissionRequest"))
-    assert not mark_seen(ss, "s1", 200) and ss["s1"].state == "waiting"
-    assert not mark_seen(ss, "nope", 200)
+    assert hide(ss, "s1") and ss["s1"].hidden
+    assert not hide(ss, "s1")  # já escondida
+    assert not hide(ss, "nope")
+    apply_event(ss, ev("Notification", notification_type="idle_prompt"), 200)  # não muda estado
+    assert ss["s1"].hidden
+    apply_event(ss, ev("UserPromptSubmit"), 201)  # mudou de estado → reaparece
+    assert not ss["s1"].hidden
+
+
+def test_hidden_working_session_reappears_when_waiting():
+    ss = run(ev("UserPromptSubmit"))
+    hide(ss, "s1")
+    apply_event(ss, ev("PostToolUse", tool_name="Read"), 2)
+    assert ss["s1"].hidden
+    apply_event(ss, ev("PermissionRequest"), 3)
+    assert not ss["s1"].hidden and ss["s1"].state == "waiting"
 
 
 def test_display_names_disambiguates():

@@ -60,3 +60,14 @@ def test_decode_valid():
 
 def test_sort_is_stable_api():
     assert sort_sessions([]) == []
+
+
+def test_done_and_error_carry_local_time_others_do_not():
+    import time
+    since = 1_800_000_000.0
+    ss = [Session("d", "a", "done", since), Session("e", "b", "error", since),
+          Session("w", "c", "waiting", since), Session("k", "d", "working", since)]
+    by_id = {s["id"]: s for s in _decode_snap(encode_snapshot(ss, 1, now=since + 90))["sessions"]}
+    expected = time.strftime("%H:%M", time.localtime(since))
+    assert by_id["d"]["at"] == expected and by_id["e"]["at"] == expected
+    assert "at" not in by_id["w"] and "at" not in by_id["k"]

@@ -26,6 +26,7 @@ class Tracked:
     offset: int = -1  # até onde o transcript já foi lido; -1 = ainda não começou
     pid: int = 0  # PID do processo `claude` (0 = desconhecido)
     last_event: float = 0.0  # epoch do último evento de hook recebido
+    hidden: bool = False  # escondida pelo usuário no device; volta ao mudar de estado
     meta: dict = field(default_factory=dict)
 
     @property
@@ -98,7 +99,7 @@ def apply_event(sessions: dict[str, Tracked], event: dict, now: float) -> bool:
     if new != cur.state:
         if new in WATCHED_STATES and cur.state not in WATCHED_STATES:
             _start_watch(cur)  # marca o offset já no evento: uma recusa rápida não escapa
-        cur.state, cur.since, changed = new, now, True
+        cur.state, cur.since, cur.hidden, changed = new, now, False, True
     return changed
 
 
@@ -111,11 +112,11 @@ def expire(sessions: dict[str, Tracked], now: float, done_ttl: float = DONE_TTL_
     return changed
 
 
-def mark_seen(sessions: dict[str, Tracked], sid: str, now: float) -> bool:
-    """Usuário focou a sessão pelo device: "done"/"error" já foram vistos → "idle"."""
+def hide(sessions: dict[str, Tracked], sid: str) -> bool:
+    """Usuário escondeu a sessão no device. Ela reaparece quando mudar de estado."""
     s = sessions.get(sid)
-    if s and s.state in ("done", "error"):
-        s.state, s.since = "idle", now
+    if s and not s.hidden:
+        s.hidden = True
         return True
     return False
 
@@ -202,7 +203,7 @@ def check_interrupts(sessions: dict[str, Tracked], now: float) -> list[str]:
             t.offset = -1
             continue
         if scan_transcript(t):
-            t.state, t.since, t.offset = "done", now, -1
+            t.state, t.since, t.offset, t.hidden = "done", now, -1, False
             hit.append(t.id)
     return hit
 
