@@ -1,0 +1,26 @@
+#!/bin/bash
+# claudinho-hook: repassa eventos de hook do Claude Code para o claudinhod.
+# Regras: nunca bloquear o Claude, nunca falhar (sempre exit 0), mandar só o necessário.
+SOCK="${CLAUDINHO_SOCK:-$HOME/.claudinho/sock}"
+[ -S "$SOCK" ] || { cat >/dev/null; exit 0; }
+
+# Depuração temporária: com ~/.claudinho/debug-raw presente, guarda o JSON bruto (local, chmod 600).
+if [ -f "$HOME/.claudinho/debug-raw" ]; then
+  RAW="$(cat)"
+  ( umask 077; printf '%s\n' "$RAW" >> "$HOME/.claudinho/raw-events.jsonl" )
+  exec < <(printf '%s' "$RAW")
+fi
+
+# Só os campos que o daemon usa: tool_input/prompt (grandes/sensíveis) ficam de fora.
+# transcript_path é só o caminho local, para o daemon detectar interrupções (Esc/recusa).
+/usr/bin/jq -c \
+  --arg iterm "${ITERM_SESSION_ID:-}" \
+  --arg term "${TERM_PROGRAM:-}" \
+  --arg ppid "$PPID" \
+  --arg proj "${CLAUDE_PROJECT_DIR:-}" \
+  '{hook_event_name, session_id, cwd, transcript_path, tool_name, notification_type, message,
+    _iterm: $iterm, _term: $term, _project: $proj, _ppid: ($ppid | tonumber? // 0)}
+   | with_entries(select(.value != null))' 2>/dev/null \
+  | /usr/bin/nc -U -w 1 "$SOCK" >/dev/null 2>&1
+
+exit 0
