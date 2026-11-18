@@ -10,7 +10,7 @@ Assistente de mesa para o Claude Code, rodando num **ESP32-S3-BOX** ligado ao Ma
 ```
 Claude Code ─hook─▶ claudinho-hook ─socket─▶ claudinhod (launchd) ─USB─▶ ESP32-S3-BOX
                                                    ▲                         │
-                                     iTerm2 ◀─osascript─── {"focus": id} ◀───┘ (toque)
+                              iTerm2 / Rex ◀─osascript─── {"focus": id} ◀───┘ (toque)
 ```
 
 ## Requisitos
@@ -36,7 +36,16 @@ O `install.sh`:
 
 Pode rodar de novo quantas vezes quiser; nada é duplicado. Use `CLAUDINHO_NO_DAEMON=1` para instalar só o hook.
 
-**Na primeira vez que você tocar numa sessão**, o macOS pede permissão para o daemon controlar o iTerm. Aceite. Se negar por engano, libere depois em *Ajustes do Sistema → Privacidade e Segurança → Automação*.
+**Na primeira vez que você tocar numa sessão**, o macOS pede permissão para o daemon controlar o iTerm ou o Rex. Aceite. Se negar por engano, libere depois em *Ajustes do Sistema → Privacidade e Segurança → Automação*.
+
+### Terminal Rex
+
+Funciona sem configuração extra: o hook lê `REX_SESSION` e `REX_BLOCK` do ambiente. Ao tocar numa sessão, o daemon:
+
+1. roda `rex focus` para deixar a aba certa ativa;
+2. pede ao app, por AppleScript (`show`), para mostrar a sessão e vir para a frente, mesmo que você esteja em outra sessão. Isso **não** exige o Remote Control do Rex.
+
+O nome do app está fixo como `Rex Beta` (`REX_APP` em `host/focus.py`); ajuste se usar outra versão. Sessões já abertas só passam a ter o foco do Rex depois do próximo evento de hook, então rode o `install.sh` de novo e reinicie-as.
 
 ## Desinstalação
 
