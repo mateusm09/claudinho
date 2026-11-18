@@ -354,7 +354,7 @@ def main() -> None:
 
         def run() -> None:
             t0 = time.monotonic()
-            result = focus(t.iterm, t.term)
+            result = focus(t.iterm, t.term, t.rex_session, t.rex_block)
             log.info("focus %s (%s) → %s em %.0f ms", t.name, t.state, result, (time.monotonic() - t0) * 1000)
 
         threading.Thread(target=run, daemon=True).start()  # não bloqueia a leitura da serial

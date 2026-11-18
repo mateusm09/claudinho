@@ -3,7 +3,7 @@
 Assistente de mesa para o Claude Code, rodando num **ESP32-S3-BOX** ligado ao Mac por USB.
 
 - Mostra cada sessão do Claude Code e o estado dela: **esperando** (âmbar), **erro** (vermelho), **pronto** (verde) ou **trabalhando** (azul).
-- **Tocar numa sessão**, ou no botão "Ir para", traz a aba exata do iTerm2 para a frente.
+- **Tocar numa sessão**, ou no botão "Ir para", traz a aba exata do iTerm2 ou do Rex para a frente.
 - Toca um **beep** e pisca a borda quando uma sessão passa a esperar input. Tocar no cabeçalho liga e desliga o som.
 - O mascote é animado e reage ao estado mais urgente. Quando o Mac não está conectado, ele dorme.
 
@@ -15,7 +15,7 @@ Claude Code ─hook─▶ claudinho-hook ─socket─▶ claudinhod (launchd) �
 
 ## Requisitos
 
-- macOS, iTerm2 e Claude Code. Testado na versão 2.1.325.
+- macOS, iTerm2 (ou o terminal Rex) e Claude Code. Testado na versão 2.1.325.
 - `uv`, `jq` e PlatformIO. Instalação: `brew install uv jq && uv tool install platformio`.
 - ESP32-S3-BOX, o **original**, com touch TT21100. O BOX-3 e o BOX-Lite usam outros pinos; veja `firmware/src/board.h`.
 
@@ -71,7 +71,7 @@ O hook manda ao daemon só o evento, o id da sessão, a pasta do projeto, o cami
 | `firmware/` | PlatformIO + Arduino + LovyanGFX. `board.h` (pinos do S3-BOX), `ui.cpp` (tela), `audio.cpp` (ES8311/I2S), `mascot.h` (gerado) |
 | `host/claudinhod.py` | daemon: socket dos hooks, máquina de estados, serial, foco |
 | `host/state.py` | estados, interrupções via transcript, poda de órfãs, persistência |
-| `host/focus.py` | AppleScript que seleciona a sessão do iTerm2 pelo UUID |
+| `host/focus.py` | Seleciona a sessão no iTerm2 (AppleScript, pelo UUID) ou no Rex (`rex focus`, por `REX_SESSION`/`REX_BLOCK`) |
 | `host/claudinho-hook` | hook (bash + jq + nc): ~10 ms e sempre `exit 0` |
 | `tools/mascot.py` | desenho do mascote: gera `firmware/src/mascot.h` e `assets/mascot-preview.png` |
 | `tools/flash.sh` | grava o firmware, tirando o daemon do caminho durante o upload |

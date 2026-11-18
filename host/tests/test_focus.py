@@ -51,3 +51,38 @@ def test_other_terminal_and_unknown(monkeypatch):
     patch(monkeypatch, rec)
     assert F.focus("", "Apple_Terminal") == "app"
     assert F.focus("", "") == "none"
+
+
+RS = "session:01a1eeb7-5610-7416-8f87-d73299d8a2a6"
+RB = "block:01a1eeb7-5613-7449-9334-2c6f89240328"
+
+
+def test_rex_focus_uses_rex_cli_and_activates_app(monkeypatch):
+    calls = []
+
+    def fake_rex(*args):
+        calls.append(args)
+        out = '{"block":{"window_id":"window:x"}}' if args[0] == "block" else ""
+        return type("P", (), {"returncode": 0, "stdout": out, "stderr": ""})()
+
+    monkeypatch.setattr(F, "_rex", fake_rex)
+    rec = Recorder()
+    patch(monkeypatch, rec)
+    assert F.focus("", "rex", RS, RB) == "session"
+    assert calls == [("focus", "-s", RS, RB)]
+    assert ("osa", (RS,)) in rec.calls  # show da sessão via AppleScript, ID por argv
+    assert not any(c[0] == "open" for c in rec.calls)
+
+
+def test_rex_show_failure_still_activates_app(monkeypatch):
+    monkeypatch.setattr(F, "_rex", lambda *a: type("P", (), {"returncode": 0, "stdout": "", "stderr": ""})())
+    rec = Recorder(osa=(1, ""))
+    patch(monkeypatch, rec)
+    assert F.focus("", "rex", RS, RB) == "session"
+    assert ("open", ("/usr/bin/open", "-a", "Rex Beta")) in rec.calls
+
+
+def test_rex_rejects_malformed_ids(monkeypatch):
+    monkeypatch.setattr(F, "_rex", lambda *a: (_ for _ in ()).throw(AssertionError("não deveria chamar")))
+    patch(monkeypatch, Recorder())
+    assert F.focus("", "", "x; rm -rf /", RB) == "none"

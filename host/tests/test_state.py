@@ -247,3 +247,9 @@ def test_apply_event_tracks_last_event():
     apply_event(ss, ev("UserPromptSubmit"), 10)
     apply_event(ss, ev("PostToolUse", tool_name="Read"), 20)  # mesmo estado, mas é atividade
     assert ss["s1"].last_event == 20 and ss["s1"].since == 10
+
+
+def test_rex_ids_are_tracked():
+    ss = {}
+    apply_event(ss, ev("SessionStart", _rex_session="session:a", _rex_block="block:b"), 1)
+    assert (ss["s1"].rex_session, ss["s1"].rex_block) == ("session:a", "block:b")

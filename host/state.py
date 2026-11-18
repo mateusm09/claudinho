@@ -22,6 +22,8 @@ class Tracked:
     since: float
     iterm: str = ""  # UUID da sessão no iTerm2 (parte depois do ':' do ITERM_SESSION_ID)
     term: str = ""  # TERM_PROGRAM
+    rex_session: str = ""  # REX_SESSION / REX_BLOCK, quando roda no terminal Rex
+    rex_block: str = ""
     transcript: str = ""  # caminho do JSONL da sessão (para detectar interrupções)
     offset: int = -1  # até onde o transcript já foi lido; -1 = ainda não começou
     pid: int = 0  # PID do processo `claude` (0 = desconhecido)
@@ -78,8 +80,9 @@ def apply_event(sessions: dict[str, Tracked], event: dict, now: float) -> bool:
     # Raiz do projeto (CLAUDE_PROJECT_DIR) é estável; o cwd muda a cada `cd` da sessão.
     where = event.get("_project") or event.get("cwd", "")
     if cur is None:
-        t = Tracked(sid, where, new, now, iterm, event.get("_term", ""), event.get("transcript_path", ""),
-                    last_event=now)
+        t = Tracked(sid, where, new, now, iterm, event.get("_term", ""),
+                    event.get("_rex_session", ""), event.get("_rex_block", ""),
+                    event.get("transcript_path", ""), last_event=now)
         if new in WATCHED_STATES:
             _start_watch(t)
         sessions[sid] = t
@@ -96,6 +99,8 @@ def apply_event(sessions: dict[str, Tracked], event: dict, now: float) -> bool:
         cur.iterm = iterm
     if event.get("_term"):
         cur.term = event["_term"]
+    if event.get("_rex_session") and event.get("_rex_block"):
+        cur.rex_session, cur.rex_block = event["_rex_session"], event["_rex_block"]
     if new != cur.state:
         if new in WATCHED_STATES and cur.state not in WATCHED_STATES:
             _start_watch(cur)  # marca o offset já no evento: uma recusa rápida não escapa

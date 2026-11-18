@@ -16,10 +16,12 @@ fi
 /usr/bin/jq -c \
   --arg iterm "${ITERM_SESSION_ID:-}" \
   --arg term "${TERM_PROGRAM:-}" \
+  --arg rexs "${REX_SESSION:-}" \
+  --arg rexb "${REX_BLOCK:-}" \
   --arg ppid "$PPID" \
   --arg proj "${CLAUDE_PROJECT_DIR:-}" \
   '{hook_event_name, session_id, cwd, transcript_path, tool_name, notification_type, message,
-    _iterm: $iterm, _term: $term, _project: $proj, _ppid: ($ppid | tonumber? // 0)}
+    _iterm: $iterm, _term: $term, _rex_session: $rexs, _rex_block: $rexb, _project: $proj, _ppid: ($ppid | tonumber? // 0)}
    | with_entries(select(.value != null))' 2>/dev/null \
   | /usr/bin/nc -U -w 1 "$SOCK" >/dev/null 2>&1
 
