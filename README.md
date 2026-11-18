@@ -4,6 +4,7 @@ Assistente de mesa para o Claude Code, rodando num **ESP32-S3-BOX** ligado ao Ma
 
 - Mostra cada sessão do Claude Code e o estado dela: **esperando** (âmbar), **erro** (vermelho), **pronto** (verde) ou **trabalhando** (azul).
 - **Tocar numa sessão**, ou no botão "Ir para", traz a aba exata do iTerm2 ou do Rex para a frente.
+- Uma **barra no rodapé** mostra o uso do limite de 5h (verde, âmbar acima de 60%, vermelho acima de 85%) e quando ele reseta. O ícone de olho à esquerda mostra ou esconde a barra.
 - Toca um **beep** e pisca a borda quando uma sessão passa a esperar input. Tocar no cabeçalho liga e desliga o som.
 - O mascote é animado e reage ao estado mais urgente. Quando o Mac não está conectado, ele dorme.
 
@@ -31,6 +32,7 @@ Claude Code ─hook─▶ claudinho-hook ─socket─▶ claudinhod (launchd) �
 
 O `install.sh`:
 - **acrescenta** o hook em `~/.claude/settings.json`. Os hooks que já existem, como o `cc-status` do iTerm, continuam lá. Antes de alterar, ele faz um backup `settings.json.bak-claudinho-*`.
+- configura o **statusline** do Claude Code (`claudinho-statusline`), que entrega o uso do limite de 5h. Se você já tinha um statusline, ele continua rodando por dentro do nosso e volta ao original na desinstalação. O uso só atualiza quando o Claude Code redesenha o statusline (a cada resposta), e aparece `--` até a primeira.
 - copia o hook e o daemon para `~/.claudinho/`, assim nada depende do repositório depois de instalado.
 - carrega o LaunchAgent `com.claudinho.daemon`, que inicia o daemon no login e o reinicia se cair.
 
@@ -81,6 +83,7 @@ O hook manda ao daemon só o evento, o id da sessão, a pasta do projeto, o cami
 | `host/claudinhod.py` | daemon: socket dos hooks, máquina de estados, serial, foco |
 | `host/state.py` | estados, interrupções via transcript, poda de órfãs, persistência |
 | `host/focus.py` | Seleciona a sessão no iTerm2 (AppleScript, pelo UUID) ou no Rex (`rex focus`, por `REX_SESSION`/`REX_BLOCK`) |
+| `host/claudinho-statusline` | statusline: repassa `rate_limits.five_hour` ao daemon (e roda o statusline anterior, se havia) |
 | `host/claudinho-hook` | hook (bash + jq + nc): ~10 ms e sempre `exit 0` |
 | `tools/mascot.py` | desenho do mascote: gera `firmware/src/mascot.h` e `assets/mascot-preview.png` |
 | `tools/flash.sh` | grava o firmware, tirando o daemon do caminho durante o upload |

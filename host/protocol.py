@@ -30,7 +30,9 @@ def sort_sessions(sessions: list[Session]) -> list[Session]:
     return sorted(sessions, key=lambda s: (PRIORITY[s.state], s.since))
 
 
-def encode_snapshot(sessions: list[Session], seq: int, now: float) -> bytes:
+def encode_snapshot(sessions: list[Session], seq: int, now: float,
+                    usage: tuple[int, int] | None = None) -> bytes:
+    """`usage` = (% usado da janela de 5h, segundos até ela resetar); None = desconhecido."""
     def item(s: Session) -> dict:
         d = {"id": s.id, "name": s.name[:32], "state": s.state, "age": max(0, int(now - s.since))}
         if s.state in SHOW_TIME:
@@ -38,10 +40,12 @@ def encode_snapshot(sessions: list[Session], seq: int, now: float) -> bytes:
         return d
 
     payload = {"snap": {"seq": seq, "sessions": [item(s) for s in sort_sessions(sessions)]}}
+    if usage is not None:
+        payload["snap"]["usage"] = {"pct": usage[0], "reset_in": usage[1]}
     line = json.dumps(payload, separators=(",", ":"), ensure_ascii=False).encode() + b"\n"
     if len(line) > MAX_LINE:
         # corta sessões do fim (menor prioridade) até caber
-        return encode_snapshot(sort_sessions(sessions)[:-1], seq, now)
+        return encode_snapshot(sort_sessions(sessions)[:-1], seq, now, usage)
     return line
 
 

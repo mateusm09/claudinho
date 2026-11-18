@@ -1,0 +1,21 @@
+#!/bin/bash
+# claudinho-statusline: o Claude Code manda o JSON do statusline a cada atualização; daqui sai só o
+# uso da janela de 5h (rate_limits.five_hour), repassado ao claudinhod. Sempre exit 0.
+# Se o usuário já tinha um statusline, o install.sh guarda o comando em ~/.claudinho/statusline-chain
+# e ele continua rodando (mesma entrada, mesma saída).
+SOCK="${CLAUDINHO_SOCK:-$HOME/.claudinho/sock}"
+CHAIN="$HOME/.claudinho/statusline-chain"
+INPUT="$(cat)"
+
+if [ -S "$SOCK" ]; then
+  printf '%s' "$INPUT" | /usr/bin/jq -c '
+    .rate_limits.five_hour
+    | select(.used_percentage != null and .resets_at != null)
+    | {_usage: {pct: .used_percentage, resets_at: .resets_at}}' 2>/dev/null \
+    | /usr/bin/nc -U -w 1 "$SOCK" >/dev/null 2>&1
+fi
+
+if [ -s "$CHAIN" ]; then
+  printf '%s' "$INPUT" | /bin/bash -c "$(cat "$CHAIN")"
+fi
+exit 0

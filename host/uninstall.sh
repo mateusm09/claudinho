@@ -4,6 +4,8 @@
 set -euo pipefail
 SETTINGS="${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}"
 HOOK_CMD="$HOME/.claudinho/bin/claudinho-hook"
+SL_CMD="$HOME/.claudinho/bin/claudinho-statusline"
+CHAIN="$HOME/.claudinho/statusline-chain"
 LABEL="com.claudinho.daemon"
 PLIST="$HOME/Library/LaunchAgents/$LABEL.plist"
 
@@ -17,12 +19,16 @@ if [ -f "$PLIST" ]; then
   echo "LaunchAgent removido."
 fi
 
-# 2. hook: remove só os grupos cujo comando é o do Claudinho; eventos que ficarem vazios somem
+# 2. hook e statusline (devolve o statusline original, se havia): remove só os grupos cujo comando é o do Claudinho; eventos que ficarem vazios somem
 if [ -f "$SETTINGS" ]; then
   TMP="$(mktemp)"
   trap 'rm -f "$TMP"' EXIT
-  jq --arg cmd "$HOOK_CMD" '
-    if .hooks then
+  ORIG_SL="$(cat "$CHAIN" 2>/dev/null || true)"
+  jq --arg cmd "$HOOK_CMD" --arg sl "$SL_CMD" --arg orig "$ORIG_SL" '
+    (if .statusLine.command == $sl then
+       (if $orig != "" then .statusLine.command = $orig else del(.statusLine) end)
+     else . end)
+    | if .hooks then
       .hooks |= (with_entries(
         .value |= map(.hooks |= map(select(.command != $cmd)) | select((.hooks | length) > 0))
       ) | with_entries(select((.value | length) > 0)))

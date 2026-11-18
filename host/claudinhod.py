@@ -47,6 +47,7 @@ class Store:
             log.info("estado restaurado: %d sessões", len(self._tracked))
         self.seq = 0
         self.changed = threading.Event()
+        self._usage: tuple[float, float] | None = None  # (% usado, epoch do reset) da janela de 5h
 
     def _save_locked(self) -> None:
         if not self._state_path:
@@ -115,13 +116,30 @@ class Store:
                 log.info("sessão %s escondida pelo usuário", self._tracked[sid].name)
                 self._notify_locked()
 
+    def set_usage(self, pct: float, resets_at: float) -> None:
+        """Uso da janela de 5h, vindo do statusline. Só acorda o enviador se o que o device mostra mudou."""
+        pct = min(100.0, max(0.0, pct))
+        with self._lock:
+            old = self._usage
+            self._usage = (pct, resets_at)
+            shown_changed = old is None or round(old[0]) != round(pct) or old[1] != resets_at
+        if shown_changed:
+            self.changed.set()  # não grava em disco: o uso é efêmero
+
+    def _usage_locked(self, now: float) -> tuple[int, int] | None:
+        # Janela já resetada: o número guardado é de outra janela, então não mostra nada.
+        if self._usage is None or self._usage[1] <= now:
+            return None
+        return round(self._usage[0]), int(self._usage[1] - now)
+
     def snapshot_line(self) -> bytes:
         with self._lock:
             self.seq += 1
             names = state.display_names(list(self._tracked.values()))
             visible = [Session(t.id, names[t.id], t.state, t.since)
                        for t in self._tracked.values() if t.state != "idle" and not t.hidden]
-            return encode_snapshot(visible, self.seq, time.time())
+            now = time.time()
+            return encode_snapshot(visible, self.seq, now, self._usage_locked(now))
 
 
 def find_claude_pid(pid: int, max_depth: int = 8) -> int:
@@ -188,6 +206,13 @@ def serve_hooks(store: Store, sock_path: Path) -> None:
                 log.warning("evento inválido do hook")
                 continue
             if not isinstance(event, dict):
+                continue
+            if "_usage" in event:  # vem do claudinho-statusline, não de um hook
+                u = event["_usage"]
+                try:
+                    store.set_usage(float(u["pct"]), float(u["resets_at"]))
+                except (TypeError, KeyError, ValueError):
+                    log.warning("uso inválido do statusline: %r", u)
                 continue
             # PID do `claude` tem que ser resolvido COM a conexão aberta: ao fechar, o nc e o
             # shell do hook terminam e a cadeia de processos some. Só no 1º evento da sessão.

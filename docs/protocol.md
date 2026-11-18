@@ -26,6 +26,7 @@ Linhas que não são JSON válido (por exemplo, o log de boot da ROM) são ignor
 - `state`: um dos valores `waiting` | `error` | `done` | `working` | `idle`.
 - `age`: segundos desde a última mudança de estado. O device continua somando o tempo localmente entre um snapshot e outro.
 - `at` (só em `done` e `error`): `"HH:MM"` no horário local do Mac em que a sessão entrou no estado. Quando existe, o device mostra esse horário no lugar do contador.
+- `usage` (opcional, no nível de `snap`): `{"pct":42,"reset_in":5400}` é o uso da janela de 5h do Claude Code, em % e em segundos até ela resetar. O host omite o campo quando não sabe o uso (ainda sem dado, ou janela já resetada). O device mostra `--` sem o campo e continua descontando `reset_in` localmente.
 - `name`: o nome curto (basename do `cwd`), que o device trunca para caber na tela.
 
 O host envia o snapshot completo:

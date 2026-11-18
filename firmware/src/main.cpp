@@ -6,7 +6,7 @@
 #include "model.h"
 #include "ui.h"
 
-static constexpr const char *FW_VERSION = "0.6.0";
+static constexpr const char *FW_VERSION = "0.7.0";
 static constexpr int BTN_IDX = 1000;  // mesmo valor de ui.cpp
 
 static LGFX lcd;
@@ -39,6 +39,12 @@ static void handleLine(const char *line) {
     s.state = parseState(o["state"] | "idle");
     s.age = o["age"] | 0;
     strlcpy(s.at, o["at"] | "", sizeof s.at);
+  }
+  JsonObject usage = snap["usage"];
+  if (!usage.isNull()) {
+    next.haveUsage = true;
+    next.usagePct = (uint8_t)constrain((int)(usage["pct"] | 0), 0, 100);
+    next.usageResetIn = usage["reset_in"] | 0;
   }
   next.seq = snap["seq"] | 0;
   next.rxMillis = millis();
@@ -110,6 +116,9 @@ static void pollTouch(uint32_t now) {
       audio::setMuted(!audio::muted());
       ui::setMutedIcon(audio::muted());
       if (!audio::muted()) audio::chime();  // amostra ao religar
+      dirty = true;
+    } else if (hit == ui::HIT_USAGE) {
+      ui::toggleUsage();
       dirty = true;
     } else if (hit >= ui::HIT_HIDE) {
       hideSession(hit - ui::HIT_HIDE);

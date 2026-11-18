@@ -71,3 +71,9 @@ def test_done_and_error_carry_local_time_others_do_not():
     expected = time.strftime("%H:%M", time.localtime(since))
     assert by_id["d"]["at"] == expected and by_id["e"]["at"] == expected
     assert "at" not in by_id["w"] and "at" not in by_id["k"]
+
+
+def test_usage_is_optional_in_snapshot():
+    assert "usage" not in _decode_snap(encode_snapshot([], 1, now=0))
+    snap = _decode_snap(encode_snapshot([], 1, now=0, usage=(42, 5400)))
+    assert snap["usage"] == {"pct": 42, "reset_in": 5400}

@@ -15,8 +15,11 @@ constexpr uint32_t FLASH_PHASE_MS = 250;
 
 constexpr int W = 320, H = 240;
 constexpr int HEADER_H = 38;
-constexpr int ROW_Y0 = 42, ROW_H = 36, ROW_GAP = 4, VISIBLE_ROWS = 4;
-constexpr int BTN_Y = 198, BTN_H = 38;
+// Faixa inferior fixa com o uso do limite de 5h (o layout não pula ao mostrar/esconder)
+constexpr int USAGE_H = 22, USAGE_Y = H - USAGE_H, USAGE_ICON_W = 40;
+constexpr int ROW_Y0 = 42, ROW_H = 36, ROW_GAP = 4, VISIBLE_ROWS = 3;
+constexpr int BTN_H = 30, BTN_Y = USAGE_Y - 10 - BTN_H;
+bool g_showUsage = true;
 constexpr int BTN_IDX = 1000;  // marcador interno de "botão pressionado"
 constexpr int HIDE_W = 36;     // zona de toque do ícone "esconder", na ponta direita da linha
 constexpr int HIDE_X = W - 6 - HIDE_W;
@@ -157,17 +160,45 @@ void drawRow(const Model &m, int i, int y, uint32_t nowMs) {
   drawFit(s.name, 20, y + ROW_H / 2, right - ageW - 8 - labelW - 10 - 20);
 }
 
+void drawEyeIcon(int cx, int cy, uint32_t c, bool crossed) {
+  if (crossed) { drawHideIcon(cx, cy, c); return; }
+  g_fb.drawEllipse(cx, cy, 7, 4, c);
+  g_fb.fillCircle(cx, cy, 2, c);
+}
+
+void fmtReset(uint32_t s, char *out, size_t n) {
+  if (s >= 3600) snprintf(out, n, "%uh%02um", (unsigned)(s / 3600), (unsigned)(s % 3600 / 60));
+  else snprintf(out, n, "%um", (unsigned)((s + 59) / 60));
+}
+
+void drawUsage(const Model &m, uint32_t nowMs) {
+  int cy = USAGE_Y + USAGE_H / 2;
+  drawEyeIcon(USAGE_ICON_W / 2 + 2, cy, rgb(g_showUsage ? C_TEXT : C_MUTED), !g_showUsage);
+  if (!g_showUsage) return;
+  g_fb.setFont(&fonts::Font2);
+  g_fb.setTextDatum(textdatum_t::middle_left);
+  g_fb.setTextColor(rgb(C_MUTED));
+  g_fb.drawString("5h", USAGE_ICON_W, cy);
+  int barX = USAGE_ICON_W + 22, barW = 150, barH = 8;
+  g_fb.fillRoundRect(barX, cy - barH / 2, barW, barH, 4, rgb(C_ROW));
+  char txt[24] = "--";
+  if (m.haveUsage) {
+    uint32_t c = m.usagePct >= 85 ? C_STATE[ST_ERROR] : m.usagePct >= 60 ? C_STATE[ST_WAITING] : C_STATE[ST_DONE];
+    int fw = std::max<int>(m.usagePct * barW / 100, m.usagePct ? barH : 0);
+    if (fw) g_fb.fillRoundRect(barX, cy - barH / 2, fw, barH, 4, rgb(c));
+    char rs[12];
+    fmtReset(m.resetInNow(nowMs), rs, sizeof rs);
+    snprintf(txt, sizeof txt, "%u%% %s", (unsigned)m.usagePct, rs);
+  }
+  g_fb.setTextColor(rgb(C_TEXT));
+  g_fb.drawString(txt, barX + barW + 8, cy);
+}
+
 void drawButton(const Model &m, uint32_t nowMs) {
   int t = m.target();
   bool pressed = g_pressed == BTN_IDX && nowMs < g_pressedUntil;
   g_fb.setTextDatum(textdatum_t::middle_center);
-  if (t < 0) {
-    g_fb.drawRoundRect(6, BTN_Y, W - 12, BTN_H, 8, rgb(0x333333));
-    g_fb.setFont(&fonts::Font2);
-    g_fb.setTextColor(rgb(C_MUTED));
-    g_fb.drawString("nada pedindo atencao", W / 2, BTN_Y + BTN_H / 2);
-    return;
-  }
+  if (t < 0) return;  // nada pedindo atenção: sem botão
   uint32_t c = C_STATE[m.s[t].state];
   g_fb.fillRoundRect(6, BTN_Y, W - 12, BTN_H, 8, pressed ? rgb(0xFFFFFF) : rgb(c));
   g_fb.setFont(&fonts::FreeSansBold9pt7b);
@@ -225,6 +256,7 @@ void render(const Model &m, uint32_t nowMs) {
     }
   }
   drawButton(m, nowMs);
+  if (m.hostAlive(nowMs)) drawUsage(m, nowMs);
   if (nowMs < g_flashUntil && (g_flashUntil - nowMs) / FLASH_PHASE_MS % 2 == 0) {
     for (int i = 0; i < 4; i++) g_fb.drawRoundRect(i, i, W - 2 * i, H - 2 * i, 8, rgb(C_STATE[ST_WAITING]));
   }
@@ -242,10 +274,12 @@ bool animDue(const Model &m, uint32_t nowMs) {
 
 void flashBorder(uint32_t untilMs) { g_flashUntil = untilMs; }
 void setMutedIcon(bool muted) { g_mutedIcon = muted; }
+void toggleUsage() { g_showUsage = !g_showUsage; }
 
 int hitTest(const Model &m, int x, int y) {
   if (y < HEADER_H) return HIT_HEADER;  // liga/desliga o som (funciona mesmo sem host)
   if (!m.hostAlive(millis())) return -1;
+  if (y >= USAGE_Y) return x < USAGE_ICON_W + 8 ? HIT_USAGE : -1;
   if (y >= BTN_Y && y < BTN_Y + BTN_H) return m.target() >= 0 ? BTN_IDX : -1;
   if (y >= ROW_Y0 && y < BTN_Y) {
     int i = (y - ROW_Y0) / (ROW_H + ROW_GAP);

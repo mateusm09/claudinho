@@ -26,3 +26,30 @@ def test_hidden_flag_survives_restart(tmp_path):
     store.apply({"hook_event_name": "Stop", "session_id": "a", "cwd": "/r/a"})
     store.hide("a")
     assert ids(d.Store(tmp_path / "state.json")) == []
+
+
+def _usage(store):
+    return json.loads(store.snapshot_line())["snap"].get("usage")
+
+
+def test_usage_reaches_snapshot_and_expires(tmp_path):
+    import time
+    store = d.Store(None)
+    assert _usage(store) is None
+    store.set_usage(41.6, time.time() + 3600)
+    u = _usage(store)
+    assert u["pct"] == 42 and 3590 <= u["reset_in"] <= 3600
+    store.set_usage(150, time.time() - 1)  # janela já resetada: não mostra
+    assert _usage(store) is None
+
+
+def test_usage_only_wakes_sender_when_visible_value_changes():
+    import time
+    store = d.Store(None)
+    reset = time.time() + 3600
+    store.set_usage(10.2, reset)
+    store.changed.clear()
+    store.set_usage(10.4, reset)  # mesmo % arredondado
+    assert not store.changed.is_set()
+    store.set_usage(11, reset)
+    assert store.changed.is_set()

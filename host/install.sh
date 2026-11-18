@@ -7,21 +7,32 @@ set -euo pipefail
 HERE="$(cd "$(dirname "$0")" && pwd)"
 SETTINGS="${CLAUDE_SETTINGS:-$HOME/.claude/settings.json}"
 DEST="$HOME/.claudinho/bin/claudinho-hook"
+SL_DEST="$HOME/.claudinho/bin/claudinho-statusline"
+CHAIN="$HOME/.claudinho/statusline-chain"
 EVENTS='["SessionStart","UserPromptSubmit","PreToolUse","PostToolUse","Notification","PermissionRequest","Stop","StopFailure","SessionEnd","PostToolUseFailure","PermissionDenied","ElicitationResult"]'
 
 # Copia hook e daemon para fora do repositório (o volume externo pode não estar montado).
 mkdir -p "$(dirname "$DEST")" "$HOME/.claudinho/app"
 chmod 700 "$HOME/.claudinho"
 install -m 755 "$HERE/claudinho-hook" "$DEST"
+install -m 755 "$HERE/claudinho-statusline" "$SL_DEST"
 install -m 644 "$HERE"/{protocol,state,focus}.py "$HOME/.claudinho/app/"
 install -m 755 "$HERE/claudinhod.py" "$HOME/.claudinho/app/"
 
 [ -f "$SETTINGS" ] || echo '{}' > "$SETTINGS"
 
+# statusline: é por ele que o Claude Code entrega o uso do limite de 5h. Um statusline que já
+# existe vai para o CHAIN e continua rodando por dentro do nosso (o comando original não se perde).
+OLD_SL="$(jq -r '.statusLine.command // empty' "$SETTINGS")"
+if [ -n "$OLD_SL" ] && [ "$OLD_SL" != "$SL_DEST" ]; then
+  printf '%s\n' "$OLD_SL" > "$CHAIN"
+fi
+
 TMP="$(mktemp)"
 trap 'rm -f "$TMP"' EXIT
-jq --arg cmd "$DEST" --argjson events "$EVENTS" '
-  reduce $events[] as $e (.;
+jq --arg cmd "$DEST" --arg sl "$SL_DEST" --argjson events "$EVENTS" '
+  .statusLine = ((.statusLine // {"type": "command"}) + {"type": "command", "command": $sl})
+  | reduce $events[] as $e (.;
     .hooks[$e] = (.hooks[$e] // [])
     | if any(.hooks[$e][]?.hooks[]?; .command == $cmd) then .
       else .hooks[$e] += [{"hooks": [{"type": "command", "command": $cmd, "timeout": 2}]}]
